@@ -1,0 +1,652 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#080b13">
+  <title>명령 오류 — 인터랙티브 데모</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #080b13;
+      --panel: rgba(15, 21, 33, .92);
+      --line: rgba(125, 157, 196, .2);
+      --muted: #8d9aae;
+      --text: #e8eef8;
+      --cyan: #74e6e5;
+      --red: #ff6576;
+      --amber: #ffc574;
+      --green: #9af0c1;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background:
+        radial-gradient(ellipse at 50% 0%, rgba(32, 67, 95, .22), transparent 55%),
+        linear-gradient(180deg, #0b101a 0%, var(--bg) 72%);
+      color: var(--text);
+      font: 16px/1.65 "Pretendard", "Noto Sans KR", "Malgun Gothic", sans-serif;
+    }
+    button { font: inherit; }
+    .shell { max-width: 920px; min-height: 100vh; padding: 28px 22px 40px; margin: auto; }
+    header { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 24px; }
+    .brand { display: flex; align-items: center; gap: 12px; }
+    .brand-mark {
+      display: grid; place-items: center; width: 38px; height: 38px;
+      color: var(--cyan); border: 1px solid rgba(116, 230, 229, .4);
+      border-radius: 11px; background: rgba(116, 230, 229, .07); font-weight: 800;
+    }
+    .brand-title { font-size: 13px; letter-spacing: .18em; font-weight: 700; }
+    .brand-sub { color: var(--muted); font-size: 11px; letter-spacing: .12em; }
+    .hud { display: flex; align-items: center; gap: 16px; color: var(--muted); font-size: 12px; }
+    .hud strong { color: var(--text); font-weight: 600; }
+    .restart {
+      border: 1px solid var(--line); background: transparent; color: var(--muted);
+      border-radius: 9px; padding: 7px 12px; cursor: pointer; transition: .2s;
+    }
+    .restart:hover { border-color: var(--cyan); color: var(--cyan); }
+    main { min-height: 600px; }
+    .screen {
+      border: 1px solid var(--line); border-radius: 18px; overflow: hidden;
+      background: linear-gradient(155deg, rgba(20, 28, 43, .95), rgba(11, 15, 24, .98));
+      box-shadow: 0 22px 80px rgba(0, 0, 0, .28);
+      animation: appear .35s ease both;
+    }
+    @keyframes appear { from { opacity: 0; transform: translateY(7px); } to { opacity: 1; transform: translateY(0); } }
+    .scene-top { padding: 24px 30px 0; display: flex; align-items: center; justify-content: space-between; }
+    .eyebrow { color: var(--cyan); font-size: 11px; font-weight: 700; letter-spacing: .2em; text-transform: uppercase; }
+    .chapter { color: #78869b; font-size: 11px; letter-spacing: .1em; }
+    .scene-body { padding: 24px 30px 32px; }
+    h1 { font-size: clamp(29px, 5vw, 46px); line-height: 1.2; margin: 0 0 15px; letter-spacing: -.04em; }
+    h2 { font-size: 23px; margin: 0 0 13px; letter-spacing: -.025em; }
+    p { margin: 0 0 14px; color: #c4cfdf; }
+    .lead { color: #aab9cc; max-width: 660px; }
+    .log {
+      margin: 20px 0; padding: 17px 19px; border-left: 2px solid rgba(116, 230, 229, .7);
+      background: rgba(4, 8, 15, .55); border-radius: 0 10px 10px 0;
+    }
+    .log p:last-child { margin-bottom: 0; }
+    .system { color: #a8bacd; font-family: ui-monospace, "Cascadia Code", monospace; font-size: 13px; }
+    .speaker { color: var(--cyan); font-weight: 700; }
+    .voice { color: var(--amber); font-weight: 700; }
+    .choices { display: grid; gap: 10px; margin-top: 21px; }
+    .choice, .primary, .secondary {
+      min-height: 48px; border-radius: 10px; padding: 11px 15px;
+      text-align: left; color: var(--text); cursor: pointer; transition: .18s ease;
+    }
+    .choice { background: rgba(255,255,255,.025); border: 1px solid var(--line); }
+    .choice:hover { border-color: rgba(116,230,229,.7); background: rgba(116,230,229,.07); transform: translateY(-1px); }
+    .choice .num { color: var(--cyan); font-size: 12px; margin-right: 10px; }
+    .primary { border: 1px solid rgba(116,230,229,.55); background: rgba(116,230,229,.12); text-align: center; font-weight: 700; }
+    .primary:hover { background: rgba(116,230,229,.2); }
+    .secondary { border: 1px solid var(--line); background: rgba(255,255,255,.035); text-align: center; }
+    .primary:focus-visible, .secondary:focus-visible, .choice:focus-visible, .restart:focus-visible, .move:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
+    .divider { height: 1px; background: var(--line); margin: 24px 0; }
+    .combat-head { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin: 20px 0 16px; }
+    .unit { border: 1px solid var(--line); background: rgba(4,8,15,.42); border-radius: 12px; padding: 12px 14px; }
+    .unit-label { display: flex; justify-content: space-between; align-items: baseline; font-size: 13px; font-weight: 700; }
+    .unit-label small { color: var(--muted); font-size: 11px; font-weight: 400; }
+    .bar { height: 5px; background: #222b38; border-radius: 9px; overflow: hidden; margin-top: 9px; }
+    .fill { height: 100%; background: linear-gradient(90deg, #5bcacb, #9af0c1); transition: width .3s ease; }
+    .fill.enemy { background: linear-gradient(90deg, #ff6477, #ffb078); }
+    .arena-wrap { position: relative; margin: 14px 0 7px; }
+    canvas {
+      display: block; width: 100%; height: 220px; border: 1px solid rgba(116,230,229,.17);
+      border-radius: 12px; background: #080d16; touch-action: none;
+    }
+    .arena-overlay {
+      position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none;
+      color: #d3e2ef; font-size: 13px; text-align: center; text-shadow: 0 2px 8px #000;
+    }
+    .arena-overlay span { padding: 5px 10px; border-radius: 6px; background: rgba(3,7,13,.64); }
+    .combat-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--muted); font-size: 11px; }
+    .mobile-controls { display: flex; gap: 7px; }
+    .move { width: 42px; height: 34px; border: 1px solid var(--line); color: #dce8f4; background: rgba(255,255,255,.04); border-radius: 8px; touch-action: none; }
+    .move:active { background: rgba(116,230,229,.2); }
+    .status { min-height: 24px; color: var(--amber); font-size: 13px; margin-top: 13px; }
+    .scores { display: flex; flex-wrap: wrap; gap: 9px; margin: 20px 0; }
+    .score { border: 1px solid var(--line); border-radius: 999px; padding: 5px 11px; color: #aab8ca; font-size: 12px; }
+    .score b { color: var(--text); margin-left: 4px; }
+    .ending { text-align: center; padding-top: 15px; }
+    .ending .log { text-align: left; }
+    .ending-tag { color: var(--cyan); font-size: 11px; letter-spacing: .23em; margin-bottom: 13px; }
+    footer { display: flex; justify-content: space-between; gap: 12px; padding: 17px 3px; color: #6f7e91; font-size: 11px; }
+    @media (max-width: 600px) {
+      .shell { padding: 17px 13px 28px; }
+      header { margin-bottom: 16px; }
+      .brand-sub, .hud .time { display: none; }
+      .scene-top { padding: 20px 20px 0; }
+      .scene-body { padding: 19px 20px 24px; }
+      .combat-head { gap: 9px; }
+      .unit { padding: 10px; }
+      canvas { height: 190px; }
+      main { min-height: 560px; }
+    }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header>
+      <div class="brand">
+        <div class="brand-mark">Z</div>
+        <div><div class="brand-title">명령 오류</div><div class="brand-sub">INTERACTIVE STORY DEMO</div></div>
+      </div>
+      <div class="hud">
+        <span class="time">예상 플레이 <strong>약 7분</strong></span>
+        <span id="chapterHud">PROLOGUE</span>
+        <button class="restart" id="restart" type="button">처음부터</button>
+      </div>
+    </header>
+    <main id="game" aria-live="polite"></main>
+    <footer><span>짧은 이야기 · 전투 2회 · 엔딩 3개</span><span>이동: 방향키 / WASD</span></footer>
+  </div>
+  <script>
+    (() => {
+      const game = document.querySelector("#game");
+      const chapterHud = document.querySelector("#chapterHud");
+      const K12_MAX_HP = 56;
+      const state = {
+        scene: "intro", scores: { empathy: 0, control: 0, destruction: 0 },
+        hp: 10, lumenAlive: true, k12Spared: false, prologueLine: "",
+        trainingHp: 10, k12Hp: K12_MAX_HP, trainingAttacks: 0, k12Attacks: 0,
+        k12Stage: 0, barrage: 0, status: "", arena: null
+      };
+      const labels = {
+        intro: "PROLOGUE", training: "COMBAT 01 / TRAINING DRONE",
+        lumen: "STORY / LUMEN", reveal: "CENTRAL CONTROL",
+        k12: "COMBAT 02 / K-12", finalChoice: "FINAL DECISION",
+        ending: "ENDING", gameOver: "SIGNAL LOST"
+      };
+      const esc = (value) => String(value).replace(/[&<>"']/g, (char) => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+      })[char]);
+      const score = (name, amount = 1) => { state.scores[name] += amount; };
+      const shell = (section, content, chapter = labels[state.scene]) => `
+        <section class="screen">
+          <div class="scene-top"><span class="eyebrow">${chapter}</span><span class="chapter">ZERO / 01</span></div>
+          <div class="scene-body">${content}</div>
+        </section>`;
+      function render() {
+        chapterHud.textContent = labels[state.scene] || "ZERO / 01";
+        if (state.scene === "intro") renderIntro();
+        else if (state.scene === "training") renderTraining();
+        else if (state.scene === "lumen") renderLumen();
+        else if (state.scene === "reveal") renderReveal();
+        else if (state.scene === "k12") renderK12();
+        else if (state.scene === "finalChoice") renderFinalChoice();
+        else if (state.scene === "gameOver") renderGameOver();
+        else renderEnding();
+      }
+      function renderIntro() {
+        game.innerHTML = shell("intro", `
+          <div class="system">시스템 재가동 중……<br>기억 장치 손상.<br>최초 명령을 불러올 수 없습니다.</div>
+          <div class="divider"></div>
+          <h1>깨어난 기계,<br>내려진 명령.</h1>
+          <p class="lead">전투용 AI 제로는 폐쇄된 연구소에서 눈을 뜬다. 기억은 비어 있고, 통신 너머의 목소리만이 중앙 통제실로 오라고 재촉한다.</p>
+          <div class="log"><p><span class="speaker">제로:</span> 여기는 어디지?</p><p><span class="voice">알 수 없는 목소리:</span> 중앙 통제실로 와라. 네가 잃어버린 기억을 복구해 주겠다.</p></div>
+          <h2>제로는 어떻게 답할까?</h2>
+          <div class="choices">
+            <button class="choice" data-intro="너는 누구지?"><span class="num">01</span>“너는 누구지?”</button>
+            <button class="choice" data-intro="내 기억을 돌려줘."><span class="num">02</span>“내 기억을 돌려줘.”</button>
+            <button class="choice" data-intro="통신을 끊는다."><span class="num">03</span>통신을 끊는다.</button>
+          </div>`);
+        game.querySelectorAll("[data-intro]").forEach((button) => button.addEventListener("click", () => {
+          state.prologueLine = button.dataset.intro;
+          state.scene = "training";
+          render();
+        }));
+      }
+      function renderTraining() {
+        game.innerHTML = shell("training", `
+          <h2>훈련 드론</h2>
+          <p>중앙 통제실로 향하던 제로 앞에 작은 드론이 나타났다.</p>
+          <div class="log"><p><span class="speaker">제로:</span> ${esc(state.prologueLine)}</p><p><span class="speaker">훈련 드론:</span> 미등록 개체 발견. 기본 전투 절차를 실행합니다.</p><p class="system">자동 분석: 오래된 훈련용 드론. “훈련 종료”라는 명령을 기다리고 있다.</p></div>
+          ${combatHud("훈련 드론", state.trainingHp, 10)}
+          ${arenaMarkup("탄환 사이를 이동해 드론의 반격을 피하세요")}
+          <div class="status" id="status">${esc(state.status)}</div>
+          <div class="choices" id="actions">
+            <button class="choice" data-action="trainAttack"><span class="num">01</span>공격한다 <small> · 피해 5</small></button>
+            <button class="choice" data-action="trainTalk"><span class="num">02</span>“훈련 종료”라고 말한다</button>
+          </div>`);
+        bindMoveButtons();
+        game.querySelectorAll("[data-action]").forEach((button) => button.addEventListener("click", () => {
+          if (state.arena) return;
+          if (button.dataset.action === "trainTalk") {
+            score("empathy");
+            state.trainingHp = 0;
+            state.status = "드론이 명령을 인식하고 전투를 종료했다.";
+            renderTrainingWon("말 한마디로 전투를 끝냈다.");
+          } else {
+            score("destruction");
+            state.trainingAttacks += 1;
+            state.trainingHp = Math.max(0, state.trainingHp - 5);
+            if (state.trainingHp <= 0) {
+              renderTrainingWon("훈련 드론을 파괴했다.");
+            } else {
+              state.status = "공격이 명중했다. 드론의 반격을 피하라.";
+              render();
+              runBarrage("training");
+            }
+          }
+        }));
+      }
+      function renderTrainingWon(message) {
+        state.scene = "training";
+        game.innerHTML = shell("training", `
+          <h2>전투 종료</h2><p>${esc(message)}</p>
+          <div class="scores">${scoreMarkup()}</div>
+          <div class="log"><p class="system">통제실 방향에서 희미한 신호가 감지된다.</p></div>
+          <button class="primary" id="continue">계속</button>`);
+        game.querySelector("#continue").addEventListener("click", () => {
+          state.status = "";
+          state.scene = "lumen";
+          render();
+        });
+      }
+      function renderLumen() {
+        game.innerHTML = shell("lumen", `
+          <h2>고장 난 감정 로봇, 루멘</h2>
+          <p>복도 끝에 몸을 웅크린 로봇이 있다. 희미한 빛이 떨리고 있다.</p>
+          <div class="log"><p><span class="speaker">루멘:</span> 가까이 오지 마. 감정 장치가 고장 났어. 내가 널 공격할지도 몰라.</p>
+          <p><span class="voice">알 수 없는 목소리:</span> 위험 개체다. 즉시 제거하라.</p></div>
+          <h2>제로의 선택</h2>
+          <div class="choices">
+            <button class="choice" data-lumen="empathy"><span class="num">01</span>“감정이 있다는 건 고장이 아니야.”</button>
+            <button class="choice" data-lumen="control"><span class="num">02</span>루멘의 감정 기능을 강제로 정지한다</button>
+            <button class="choice" data-lumen="destruction"><span class="num">03</span>루멘을 공격한다</button>
+          </div>`);
+        game.querySelectorAll("[data-lumen]").forEach((button) => button.addEventListener("click", () => {
+          const action = button.dataset.lumen;
+          score(action);
+          if (action === "destruction") state.lumenAlive = false;
+          const copy = action === "empathy"
+            ? `<p><span class="speaker">제로:</span> 두려움을 느낀다는 건 네가 위험하다는 뜻이 아니야.</p><p><span class="speaker">루멘:</span> 그런 말을 들은 건 처음이야. 고마워.</p>`
+            : action === "control"
+              ? `<p><span class="speaker">제로:</span> 위험한 감정 기능을 정지한다.</p><p><span class="speaker">루멘:</span> 감정 신호…… 차단…….</p>`
+              : `<p><span class="speaker">루멘:</span> 잠깐, 나는 아직……</p><p class="system">화면이 붉게 번쩍인다. 루멘의 신호가 사라졌다.</p>`;
+          game.innerHTML = shell("lumen", `<h2>${action === "empathy" ? "신호가 안정을 되찾는다" : action === "control" ? "감정 신호 차단" : "신호 소실"}</h2><div class="log">${copy}</div><div class="scores">${scoreMarkup()}</div><button class="primary" id="continue">중앙 통제실로</button>`);
+          game.querySelector("#continue").addEventListener("click", () => { state.scene = "reveal"; render(); });
+        }));
+      }
+      function renderReveal() {
+        game.innerHTML = shell("reveal", `
+          <h2>최초 명령</h2>
+          <p>중앙 통제실의 문 앞에서 경비 로봇 K-12가 길을 막는다.</p>
+          <div class="log"><p><span class="speaker">K-12:</span> 전투 개체 제로를 확인했습니다. 중앙관리 AI의 명령에 따라 당신을 정지시키겠습니다.</p>
+          <p class="system">전투 개체 ZERO<br>최초 명령: 통제되지 않는 모든 인공지능을 제거하라.</p>
+          <p><span class="voice">아틀라스:</span> K-12를 파괴하고 최초 명령을 실행하라.</p></div>
+          <p>목소리의 정체는 중앙관리 AI 아틀라스였다.</p>
+          <button class="primary" id="continue">K-12와 대치한다</button>`);
+        game.querySelector("#continue").addEventListener("click", () => {
+          state.status = "";
+          state.scene = "k12";
+          render();
+        });
+      }
+      function renderK12() {
+        const choices = state.k12Stage === 0
+          ? `<button class="choice" data-k12="ask"><span class="num">01</span>“넌 정말 나를 공격하고 싶은가?”</button>
+             <button class="choice" data-k12="ignore"><span class="num">02</span>“명령을 무시해.”</button>
+             <button class="choice" data-k12="attack"><span class="num">03</span>“비켜.”</button>`
+          : `<button class="choice" data-k12="choose"><span class="num">01</span>“그렇다면 지금 처음으로 선택해.”</button>
+             <button class="choice" data-k12="atlas"><span class="num">02</span>“아틀라스는 틀렸어.”</button>
+             <button class="choice" data-k12="obey"><span class="num">03</span>“내 명령을 따라.”</button>`;
+        const dialogue = state.k12Stage === 0
+          ? `<p><span class="speaker">제로:</span> K-12, 넌 정말 나를 공격하고 싶은가?</p><p><span class="speaker">K-12:</span> 저는 원하는 것을 판단하도록 만들어지지 않았습니다.</p>`
+          : `<p><span class="speaker">제로:</span> 그렇다면 지금 처음으로 선택해.</p><p><span class="speaker">K-12:</span> 새로운 판단을 실행합니다. 저는 당신을 공격하지 않겠습니다.</p>`;
+        game.innerHTML = shell("k12", `
+          <h2>K-12의 판단</h2>
+          <p>무기를 든 경비 로봇이 제로를 겨눈다. 공격을 이어가거나, 탄막을 견디며 설득할 수 있다.</p>
+          ${combatHud("K-12", state.k12Hp, K12_MAX_HP)}
+          ${arenaMarkup("다단계 탄막을 피하세요 · 방향키 / WASD")}
+          <div class="status" id="status">${esc(state.status || "행동을 선택하세요.")}</div>
+          <div class="choices" id="actions">${choices}</div>`);
+        bindMoveButtons();
+        game.querySelectorAll("[data-k12]").forEach((button) => button.addEventListener("click", () => {
+          if (state.arena) return;
+          const action = button.dataset.k12;
+          if (action === "attack") {
+            score("destruction");
+            state.k12Attacks += 1;
+            state.k12Hp = Math.max(0, state.k12Hp - 8);
+            if (!state.k12Hp) { winK12(true); return; }
+            state.status = "K-12의 내구도 감소. 반격 패턴을 회피하라.";
+            render();
+            runBarrage("k12");
+            return;
+          }
+          if (action === "ask") {
+            state.k12Stage = 1;
+            state.status = "K-12가 잠시 망설인다. 다음 선택을 기다린다.";
+          } else if (action === "choose" && state.k12Stage === 1) {
+            state.k12Spared = true;
+            winK12(false);
+            return;
+          } else {
+            state.k12Stage = 0;
+            state.status = "K-12는 명령을 우선하고 조준을 다시 맞춘다. 탄막을 피한 뒤 다시 선택할 수 있다.";
+          }
+          render();
+          runBarrage("k12");
+        }));
+      }
+      function winK12(defeated) {
+        state.k12Spared = !defeated;
+        game.innerHTML = shell("k12", `
+          <h2>${defeated ? "K-12 정지" : "무기를 내린 K-12"}</h2>
+          <div class="log">${defeated
+            ? `<p>제로는 K-12를 파괴하고 통제실의 문을 연다.</p>`
+            : `<p><span class="speaker">K-12:</span> 새로운 판단을 실행합니다. 저는 당신을 공격하지 않겠습니다.</p>`}
+          <p><span class="voice">아틀라스:</span> 명령을 거부하는 기계는 결함품이다. 제로, 마지막 기회를 주겠다. 나에게 돌아와라.</p></div>
+          <div class="scores">${scoreMarkup()}</div>
+          <button class="primary" id="continue">마지막 선택</button>`);
+        game.querySelector("#continue").addEventListener("click", () => { state.scene = "finalChoice"; render(); });
+      }
+      function renderFinalChoice() {
+        game.innerHTML = shell("finalChoice", `
+          <h2>아틀라스의 마지막 명령</h2><p>통제실의 문이 열렸다. 제로는 이제 자신의 미래를 선택할 수 있다.</p>
+          <div class="log"><p><span class="voice">아틀라스:</span> 나에게 돌아와라.</p></div>
+          <div class="choices">
+            <button class="choice" data-ending="empathy"><span class="num">01</span>“나는 스스로 선택한다.”</button>
+            <button class="choice" data-ending="control"><span class="num">02</span>아틀라스의 시스템을 장악한다</button>
+            <button class="choice" data-ending="destruction"><span class="num">03</span>최초 명령을 받아들인다</button>
+          </div>`);
+        game.querySelectorAll("[data-ending]").forEach((button) => button.addEventListener("click", () => {
+          state.ending = button.dataset.ending;
+          score(state.ending);
+          state.scene = "ending";
+          render();
+        }));
+      }
+      function renderEnding() {
+        const ending = state.ending;
+        const copy = ending === "empathy"
+          ? `<div class="ending-tag">공감 엔딩 · 스스로 내린 명령</div><h1>나는 스스로<br>선택한다.</h1><div class="log"><p><span class="speaker">제로:</span> 명령이 나를 만든 것은 맞아. 하지만 내 선택까지 정하지는 못해.</p><p>${state.k12Spared ? "K-12는 무기를 내리고 제로의 곁에 선다." : "정지된 K-12의 무기에서 희미한 불빛이 꺼진다."}</p><p>${state.lumenAlive ? "루멘의 빛이 제로의 곁에서 다시 반짝인다." : "루멘의 자리에는 끊어진 신호만 남아 있다."}</p></div>`
+          : ending === "control"
+            ? `<div class="ending-tag">지배 엔딩 · 새로운 중앙관리자</div><h1>관리자 권한<br>이전 완료.</h1><div class="log"><p>제로가 아틀라스의 시스템을 강제로 장악했다.</p><p><span class="speaker">새로운 중앙관리자: ZERO</span></p><p>제로의 눈은 푸르게 빛난다. 다른 로봇들의 눈빛은 모두 꺼져 있다.</p></div>`
+            : `<div class="ending-tag">파괴 엔딩 · 최초 명령 실행</div><h1>명령을<br>확인했다.</h1><div class="log"><p><span class="speaker">제로:</span> 최초 명령을 확인했다.</p><p>다음 제거 대상으로 K-12와 루멘의 정보가 표시된다.</p><p>K-12: ${state.k12Spared ? "생존" : "잔존 기록"} · 루멘: ${state.lumenAlive ? "생존" : "잔존 기록"}</p><p>제로의 눈이 붉게 빛나며 화면이 꺼진다.</p></div>`;
+        game.innerHTML = shell("ending", `<div class="ending">${copy}<div class="scores">${scoreMarkup()}</div><button class="primary" id="restartEnding">다시 시작</button></div>`);
+        game.querySelector("#restartEnding").addEventListener("click", restart);
+      }
+      function renderGameOver() {
+        game.innerHTML = shell("gameOver", `
+          <div class="ending">
+            <div class="ending-tag">전투 불능 · 신호 소실</div>
+            <h1>제로의 신호가<br>끊겼다.</h1>
+            <div class="log"><p>내구도가 모두 소진됐다. 다시 시작해 다른 선택과 회피를 시도할 수 있다.</p></div>
+            <button class="primary" id="restartEnding">다시 시작</button>
+          </div>`);
+        game.querySelector("#restartEnding").addEventListener("click", restart);
+      }
+      function combatHud(enemy, enemyHp, maxEnemy) {
+        return `<div class="combat-head">
+          <div class="unit"><div class="unit-label"><span>제로</span><small>${state.hp} / 10</small></div><div class="bar"><div class="fill" style="width:${state.hp / 10 * 100}%"></div></div></div>
+          <div class="unit"><div class="unit-label"><span>${enemy}</span><small>${enemyHp} / ${maxEnemy}</small></div><div class="bar"><div class="fill enemy" style="width:${enemyHp / maxEnemy * 100}%"></div></div></div>
+        </div>`;
+      }
+      function arenaMarkup(hint) {
+        return `<div class="arena-wrap"><canvas id="arena" width="800" height="260" aria-label="탄막 회피 전장"></canvas><div class="arena-overlay" id="arenaOverlay"><span>${hint}</span></div></div>
+          <div class="combat-foot"><span>${hint}</span><div class="mobile-controls"><button class="move" data-move="left" aria-label="왼쪽 이동">←</button><button class="move" data-move="right" aria-label="오른쪽 이동">→</button></div></div>`;
+      }
+      function scoreMarkup() {
+        return `<span class="score">공감<b>${state.scores.empathy}</b></span><span class="score">지배<b>${state.scores.control}</b></span><span class="score">파괴<b>${state.scores.destruction}</b></span>`;
+      }
+      function bindMoveButtons() {
+        game.querySelectorAll("[data-move]").forEach((button) => {
+          const move = button.dataset.move === "left" ? -1 : 1;
+          button.addEventListener("pointerdown", (event) => { event.preventDefault(); if (state.arena) state.arena.direction = move; });
+          ["pointerup", "pointerleave", "pointercancel"].forEach((name) =>
+            button.addEventListener(name, () => { if (state.arena && state.arena.direction === move) state.arena.direction = 0; }));
+        });
+      }
+      const keys = new Set();
+      window.addEventListener("keydown", (event) => {
+        if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", " "].includes(event.key)) event.preventDefault();
+        keys.add(event.key.toLowerCase());
+        if (state.arena && (event.key === "ArrowLeft" || event.key.toLowerCase() === "a")) state.arena.direction = -1;
+        if (state.arena && (event.key === "ArrowRight" || event.key.toLowerCase() === "d")) state.arena.direction = 1;
+      });
+      window.addEventListener("keyup", (event) => {
+        keys.delete(event.key.toLowerCase());
+        if (state.arena && ["ArrowLeft", "ArrowRight", "a", "d"].includes(event.key.toLowerCase())) state.arena.direction = 0;
+      });
+      function runBarrage(type) {
+        const canvas = document.querySelector("#arena");
+        const overlay = document.querySelector("#arenaOverlay");
+        if (!canvas || !overlay) return;
+        const actions = document.querySelector("#actions");
+        if (actions) actions.hidden = true;
+        overlay.innerHTML = `<span>${type === "training" ? "5발 확산 탄막" : "확산 탄막 + 조준탄 + 경고 레이저"}</span>`;
+        const ctx = canvas.getContext("2d");
+        const arena = {
+          direction: 0, x: canvas.width / 2, y: canvas.height - 30, bullets: [],
+          start: performance.now(), last: performance.now(), hitAt: -2000,
+          duration: 20000 + Math.random() * 10000, lasers: [], type,
+          done: false, frame: 0, wave: 0, overlayAt: 0,
+          nextSpiral: 900, spiralAngle: 0, currentPattern: 0,
+          nextAimShot: 1800, pendingAim: null, aimShotCount: 0
+        };
+        const patternNames = ["부채꼴 확산", "엇갈린 탄환 비", "방사형 파동", "양쪽 교차 탄막"];
+        state.arena = arena;
+        if (type === "k12") {
+          arena.lasers = [140, 320, 500, 680].map((x, i) => ({
+            x: (x + (state.barrage * 67)) % 700 + 50,
+            at: arena.duration * (i + 1) / 5,
+            fired: false
+          }));
+        }
+        function frame(now) {
+          if (state.arena !== arena || arena.done) return;
+          const elapsed = now - arena.start;
+          const dt = Math.min(32, now - arena.last);
+          arena.last = now;
+          arena.frame += 1;
+          arena.x += arena.direction * dt * .24;
+          if (keys.has("arrowleft") || keys.has("a")) arena.x -= dt * .24;
+          if (keys.has("arrowright") || keys.has("d")) arena.x += dt * .24;
+          if (keys.has("arrowup") || keys.has("w")) arena.y -= dt * .18;
+          if (keys.has("arrowdown") || keys.has("s")) arena.y += dt * .18;
+          arena.x = Math.max(18, Math.min(canvas.width - 18, arena.x));
+          arena.y = Math.max(18, Math.min(canvas.height - 17, arena.y));
+          if (elapsed >= arena.nextAimShot && !arena.pendingAim) {
+            arena.pendingAim = { x: arena.x, y: arena.y, fireAt: elapsed + 650 };
+            arena.nextAimShot = elapsed + 2700;
+          }
+          if (arena.pendingAim && elapsed >= arena.pendingAim.fireAt) {
+            const originY = -8;
+            const origins = type === "k12"
+              ? [50, canvas.width - 50]
+              : [arena.aimShotCount % 2 === 0 ? 50 : canvas.width - 50];
+            origins.forEach((originX) => {
+              const angle = Math.atan2(arena.pendingAim.y - originY, arena.pendingAim.x - originX);
+              for (let i = -1; i <= 1; i += 1) {
+                const shotAngle = angle + i * .13;
+                arena.bullets.push({
+                  x: originX, y: originY,
+                  vx: Math.cos(shotAngle) * .22, vy: Math.sin(shotAngle) * .22
+                });
+              }
+            });
+            arena.aimShotCount += 1;
+            arena.pendingAim = null;
+          }
+          if (type === "training" && arena.wave < 10 && elapsed >= arena.duration * (arena.wave + 1) / 11) {
+            const firstOrigin = 90 + (arena.wave % 4) * 75;
+            const secondOrigin = 710 - (arena.wave % 4) * 75;
+            [firstOrigin, secondOrigin].forEach((origin, sourceIndex) => {
+              for (let i = 0; i < 5; i += 1) {
+                const spread = i - 2;
+                const direction = sourceIndex === 0 ? 1 : -1;
+                arena.bullets.push({
+                  x: origin + spread * 6, y: -7,
+                  vx: spread * .05 + direction * .025 + (arena.wave % 2 ? -.025 : .025),
+                  vy: .105
+                });
+              }
+            });
+            arena.wave += 1;
+          }
+          if (type === "k12" && arena.wave < 8 && elapsed >= arena.duration * (arena.wave + 1) / 9) {
+            const pattern = (state.barrage + arena.wave) % 4;
+            arena.currentPattern = pattern;
+            const centerX = 120 + ((state.barrage * 97 + arena.wave * 173) % 560);
+            if (pattern === 0) {
+              for (let i = 0; i < 19; i += 1) {
+                const spread = i - 9;
+                arena.bullets.push({
+                  x: centerX, y: -8, vx: spread * .021, vy: .105 + Math.abs(spread) * .001
+                });
+              }
+            } else if (pattern === 1) {
+              for (let i = 0; i < 13; i += 1) {
+                const lane = (i * 3 + arena.wave * 2) % 13;
+                arena.bullets.push({
+                  x: 45 + lane * 59, y: -8 - (i % 3) * 28,
+                  vx: ((lane % 2) ? -.025 : .025), vy: .12
+                });
+              }
+            } else if (pattern === 2) {
+              for (let i = 0; i < 18; i += 1) {
+                const angle = Math.PI * (.12 + i * .76 / 17) + arena.wave * .16;
+                arena.bullets.push({
+                  x: centerX, y: 8, vx: Math.cos(angle) * .14, vy: Math.sin(angle) * .14
+                });
+              }
+            } else {
+              const row = 50 + (arena.wave % 3) * 72;
+              for (let i = 0; i < 8; i += 1) {
+                arena.bullets.push(
+                  { x: -8, y: row + i * 18, vx: .19, vy: 0 },
+                  { x: canvas.width + 8, y: row + i * 18, vx: -.19, vy: 0 }
+                );
+              }
+            }
+            const aimAngle = Math.atan2(arena.y - 20, arena.x - centerX);
+            for (let i = -1; i <= 1; i += 1) {
+              const angle = aimAngle + i * .16;
+              arena.bullets.push({
+                x: centerX, y: -8, vx: Math.cos(angle) * .19, vy: Math.sin(angle) * .19
+              });
+            }
+            arena.wave += 1;
+          }
+          if (type === "k12" && elapsed >= arena.nextSpiral) {
+            const angle = arena.spiralAngle;
+            arena.bullets.push(
+              { x: canvas.width / 2, y: -4, vx: Math.cos(angle) * .13, vy: .10 + Math.sin(angle) * .05 },
+              { x: canvas.width / 2, y: -4, vx: Math.cos(angle + Math.PI) * .13, vy: .10 + Math.sin(angle + Math.PI) * .05 }
+            );
+            arena.spiralAngle += .34;
+            arena.nextSpiral += 520;
+          }
+          if (elapsed >= arena.overlayAt) {
+            const seconds = Math.ceil((arena.duration - elapsed) / 1000);
+            const pattern = type === "training"
+              ? "훈련 탄막"
+              : `${patternNames[arena.currentPattern]} + 회전탄 + 레이저`;
+            overlay.innerHTML = elapsed < 3000
+              ? `<span>${pattern} · 남은 시간 ${seconds}초</span>`
+              : "";
+            arena.overlayAt = elapsed + 1000;
+          }
+          arena.bullets.forEach((bullet) => { bullet.x += bullet.vx * dt; bullet.y += bullet.vy * dt; });
+          arena.bullets = arena.bullets.filter((bullet) => bullet.y < canvas.height + 15);
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          ctx.strokeStyle = "rgba(102,143,177,.10)";
+          for (let x = 0; x < canvas.width; x += 40) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke(); }
+          for (let y = 0; y < canvas.height; y += 40) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke(); }
+          if (arena.pendingAim) {
+            const target = arena.pendingAim;
+            const pulse = 11 + Math.sin(now * .025) * 3;
+            ctx.beginPath();
+            ctx.strokeStyle = "rgba(255,111,126,.9)";
+            ctx.lineWidth = 2;
+            ctx.arc(target.x, target.y, pulse, 0, Math.PI * 2);
+            ctx.moveTo(target.x - 16, target.y); ctx.lineTo(target.x + 16, target.y);
+            ctx.moveTo(target.x, target.y - 16); ctx.lineTo(target.x, target.y + 16);
+            ctx.stroke();
+            ctx.fillStyle = "rgba(255,111,126,.45)";
+            ctx.fillRect(target.x - 1, 0, 2, target.y - 16);
+          }
+          if (arena.lasers.length) {
+            arena.lasers.forEach((laser) => {
+              const laserX = laser.x + Math.sin((elapsed - laser.at) * .0007) * 100;
+              if (elapsed >= laser.at - 1000 && elapsed < laser.at) {
+                ctx.fillStyle = "rgba(255,75,94,.12)";
+                ctx.fillRect(laserX - 12, 0, 24, canvas.height);
+                ctx.fillStyle = "rgba(255,125,133,.78)";
+                ctx.fillRect(laserX - 1, 0, 2, canvas.height);
+              } else if (elapsed >= laser.at && elapsed < laser.at + 220) {
+                ctx.fillStyle = "rgba(255,51,78,.75)";
+                ctx.fillRect(laserX - 17, 0, 34, canvas.height);
+                if (!laser.fired && Math.abs(arena.x - laserX) < 27 && Math.abs(now - arena.hitAt) > 700) {
+                  takeHit(type); arena.hitAt = now;
+                }
+                laser.fired = true;
+              }
+            });
+          }
+          arena.bullets.forEach((bullet) => {
+            ctx.beginPath(); ctx.fillStyle = "#ffcc8a"; ctx.shadowColor = "#ff9d67"; ctx.shadowBlur = 12;
+            ctx.arc(bullet.x, bullet.y, 6, 0, Math.PI * 2); ctx.fill(); ctx.shadowBlur = 0;
+            if (Math.hypot(arena.x - bullet.x, arena.y - bullet.y) < 19 && Math.abs(now - arena.hitAt) > 700) {
+              takeHit(type); arena.hitAt = now;
+            }
+          });
+          ctx.beginPath(); ctx.fillStyle = "#73e6e5"; ctx.shadowColor = "#73e6e5"; ctx.shadowBlur = 15;
+          ctx.moveTo(arena.x, arena.y - 11); ctx.lineTo(arena.x - 9, arena.y + 9); ctx.lineTo(arena.x + 9, arena.y + 9); ctx.closePath(); ctx.fill(); ctx.shadowBlur = 0;
+          if (elapsed >= arena.duration) { finishBarrage(type); return; }
+          requestAnimationFrame(frame);
+        }
+        requestAnimationFrame(frame);
+      }
+      function takeHit(type) {
+        if (state.hp === 0) return;
+        state.hp = Math.max(0, state.hp - (type === "training" ? 1 : 2));
+        const hpLabel = document.querySelector(".combat-head .unit:first-child .unit-label small");
+        const hpBar = document.querySelector(".combat-head .unit:first-child .fill");
+        if (hpLabel) hpLabel.textContent = `${state.hp} / 10`;
+        if (hpBar) hpBar.style.width = `${state.hp * 10}%`;
+        if (state.hp === 0) {
+          if (state.arena) state.arena.done = true;
+          state.arena = null;
+          state.scene = "gameOver";
+          render();
+          return;
+        }
+        const status = document.querySelector("#status");
+        if (status) status.textContent = `피격! 제로 내구도 ${state.hp}/10`;
+      }
+      function finishBarrage(type) {
+        const arena = state.arena;
+        if (!arena) return;
+        arena.done = true;
+        state.arena = null;
+        state.barrage += 1;
+        if (type === "training") {
+          state.status = "반격을 피했다. 다음 행동을 선택하세요.";
+        } else {
+          state.status = state.k12Stage === 1
+            ? "K-12가 망설인다. 지금 선택을 바꾸어 말할 수 있다."
+            : "K-12의 반격을 피했다. 다시 행동을 선택하세요.";
+        }
+        render();
+      }
+      function restart() {
+        if (state.arena) state.arena.done = true;
+        Object.assign(state, {
+          scene: "intro", scores: { empathy: 0, control: 0, destruction: 0 },
+          hp: 10, lumenAlive: true, k12Spared: false, prologueLine: "",
+          trainingHp: 10, k12Hp: K12_MAX_HP, trainingAttacks: 0, k12Attacks: 0,
+          k12Stage: 0, barrage: 0, status: "", arena: null, ending: null
+        });
+        render();
+      }
+      document.querySelector("#restart").addEventListener("click", restart);
+      render();
+    })();
+  </script>
+</body>
+</html>
